@@ -1,3 +1,4 @@
+import datetime
 import importlib
 import logging
 import multiprocessing as mp
@@ -21,7 +22,8 @@ AGENT_API = {
     },
     "train": {
         "setup_training": ["self"],
-        "game_events_occurred": ["self", "old_game_state: dict", "self_action: str", "new_game_state: dict", "events: List[str]"],
+        "game_events_occurred": ["self", "old_game_state: dict", "self_action: str", "new_game_state: dict",
+                                 "events: List[str]"],
         # "enemy_game_events_occurred": ["self", "enemy_name: str", "old_enemy_game_state: dict", "enemy_action: str", "enemy_game_state: dict", "enemy_events: List[str]"],
         "end_of_round": ["self", "last_game_state: dict", "last_action: str", "events: List[str]"]
     }
@@ -53,7 +55,8 @@ class Agent:
     calling events on its AgentBackend.
     """
 
-    def __init__(self, agent_name, code_name, display_name, train: bool, backend: "AgentBackend", avatar_sprite_desc, bomb_sprite_desc):
+    def __init__(self, agent_name, code_name, display_name, train: bool, backend: "AgentBackend", avatar_sprite_desc,
+                 bomb_sprite_desc):
         self.backend = backend
 
         # Load custom avatar or standard robot avatar of assigned color
@@ -158,11 +161,11 @@ class Agent:
     def wait_for_game_event_processing(self):
         self.backend.get("game_events_occurred")
 
-#    def process_enemy_game_events(self, enemy_game_state, enemy: "Agent"):
-#        self.backend.send_event("enemy_game_events_occurred", enemy.name, enemy.last_game_state, enemy.last_action, enemy_game_state, enemy.events)
-#
-#    def wait_for_enemy_game_event_processing(self):
-#        self.backend.get("enemy_game_events_occurred")
+    #    def process_enemy_game_events(self, enemy_game_state, enemy: "Agent"):
+    #        self.backend.send_event("enemy_game_events_occurred", enemy.name, enemy.last_game_state, enemy.last_action, enemy_game_state, enemy.events)
+    #
+    #    def wait_for_enemy_game_event_processing(self):
+    #        self.backend.get("enemy_game_events_occurred")
 
     def store_game_state(self, game_state):
         self.last_game_state = game_state
@@ -210,11 +213,13 @@ class AgentRunner:
                 proper_signature = f"def {event_name}({', '.join(event_args)}):\n\tpass"
 
                 if not hasattr(module, event_name):
-                    raise NotImplementedError(f"Agent code {self.code_name} does not provide callback for {event_name}.\nAdd this function to your code in {module_name}.py:\n\n{proper_signature}")
+                    raise NotImplementedError(
+                        f"Agent code {self.code_name} does not provide callback for {event_name}.\nAdd this function to your code in {module_name}.py:\n\n{proper_signature}")
                 actual_arg_count = len(signature(getattr(module, event_name)).parameters)
                 event_arg_count = len(event_args)
                 if actual_arg_count != event_arg_count:
-                    raise TypeError(f"Agent code {self.code_name}'s {event_name!r} has {actual_arg_count} arguments, but {event_arg_count} are required.\nChange your function's signature to the following:\n\n{proper_signature}")
+                    raise TypeError(
+                        f"Agent code {self.code_name}'s {event_name!r} has {actual_arg_count} arguments, but {event_arg_count} are required.\nChange your function's signature to the following:\n\n{proper_signature}")
 
         self.fake_self = SimpleNamespace()
         self.fake_self.train = train
@@ -225,7 +230,8 @@ class AgentRunner:
         self.fake_self.logger.setLevel(s.LOG_AGENT_CODE)
         log_dir = f'agent_code/{self.code_name}/logs/'
         if not os.path.exists(log_dir): os.makedirs(log_dir)
-        handler = logging.FileHandler(f'{log_dir}{self.agent_name}.log', mode="w")
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        handler = logging.FileHandler(f'{log_dir}{self.agent_name}_{timestamp}.log', mode="w")
         handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
         handler.setFormatter(formatter)
@@ -331,7 +337,8 @@ class ProcessAgentBackend(AgentBackend):
 
         self.wta_queue = mp.Queue()
 
-        self.process = mp.Process(target=run_in_agent_runner, args=(self.train, self.agent_name, self.code_name, self.wta_queue, self.result_queue))
+        self.process = mp.Process(target=run_in_agent_runner,
+                                  args=(self.train, self.agent_name, self.code_name, self.wta_queue, self.result_queue))
 
     def start(self):
         self.process.start()

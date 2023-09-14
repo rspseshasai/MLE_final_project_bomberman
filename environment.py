@@ -562,6 +562,7 @@ class GUI:
         # World
         for x in range(self.world.arena.shape[1]):
             for y in range(self.world.arena.shape[0]):
+                pass
                 if self.world.arena[x, y] == -1:
                     self.screen.blit(self.t_wall,
                                      (s.GRID_OFFSET[0] + s.GRID_SIZE * x, s.GRID_OFFSET[1] + s.GRID_SIZE * y))
@@ -572,8 +573,8 @@ class GUI:
                          valign='center', halign='left', size='medium')
 
         # Items
-        for bomb in self.world.bombs:
-            bomb.render(self.screen, s.GRID_OFFSET[0] + s.GRID_SIZE * bomb.x, s.GRID_OFFSET[1] + s.GRID_SIZE * bomb.y)
+        # for bomb in self.world.bombs:
+        #     bomb.render(self.screen, s.GRID_OFFSET[0] + s.GRID_SIZE * bomb.x, s.GRID_OFFSET[1] + s.GRID_SIZE * bomb.y)
         for coin in self.world.coins:
             if coin.collectable:
                 coin.render(self.screen, s.GRID_OFFSET[0] + s.GRID_SIZE * coin.x,
