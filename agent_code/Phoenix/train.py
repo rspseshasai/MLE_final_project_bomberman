@@ -58,8 +58,8 @@ def reward_from_events(self, events: List[str]) -> int:
         e.MOVED_LEFT: 2,
         e.MOVED_UP: 2,
         e.MOVED_DOWN: 2,
-        e.COIN_COLLECTED: 10,
-        e.INVALID_ACTION: -5,
+        e.COIN_COLLECTED: 20,
+        e.INVALID_ACTION: -10,
         PLACEHOLDER_EVENT: -0.1,  # Custom event is bad
         e.WAITED: -5
     }

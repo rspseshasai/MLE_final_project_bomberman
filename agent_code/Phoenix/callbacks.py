@@ -40,17 +40,72 @@ def setup(self):
             self.model = pickle.load(file)
 
 
+from queue import Queue
+
+
+def calculate_direction_to_nearest_coin_bfs(game_state):
+    # Get relevant information from the game state
+    field = game_state["field"]
+    coins = game_state["coins"]
+    self_x, self_y = game_state["self"][3]  # Agent's current position
+
+    # Define possible movements (UP, RIGHT, DOWN, LEFT)
+    movements = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+    directions = ["UP", "RIGHT", "DOWN", "LEFT"]
+
+    # Create a visited matrix to keep track of visited positions
+    visited = [[False for _ in range(len(field[0]))] for _ in range(len(field))]
+    visited[self_x][self_y] = True
+
+    # Initialize a queue for BFS
+    queue = Queue()
+    queue.put((self_x, self_y, []))  # Queue stores position and path to that position
+
+    while not queue.empty():
+        x, y, path = queue.get()
+
+        # Check if the current position contains a coin
+        if (x, y) in coins:
+            # If a coin is found, return the first direction from the path
+            if len(path) > 0:
+                return path[0]
+
+        # Explore neighboring positions
+        for dx, dy in movements:
+            new_x, new_y = x + dx, y + dy
+
+            # Check if the new position is within the game board
+            if 0 <= new_x < len(field) and 0 <= new_y < len(field[0]):
+
+                # Check if the new position is a free tile and has not been visited
+                if field[new_x][new_y] == 0 and not visited[new_x][new_y]:
+                    visited[new_x][new_y] = True
+
+                    # Add the new position and path to the queue
+                    new_path = path + [directions[movements.index((dx, dy))]]
+                    queue.put((new_x, new_y, new_path))
+
+    # If no coin is found, return None
+    return None
+
+
 def act(self, game_state: dict) -> str:
     self.logger.debug("Querying model for action.")
 
     if self.train:
-        # In training mode, use epsilon-greedy exploration
-        epsilon = 0.4  # Adjust the exploration rate as needed
+        epsilon = 0.4  # Initial exploration rate, adjust as needed
         if random.random() < epsilon:
-            self.logger.debug("Choosing action purely at random.")
-            return np.random.choice(ACTIONS)  # Return a random action from ACTIONS
+            self.logger.debug("Choosing action with exploration.")
+            # Combine exploration with moving towards the nearest coin
+            direction_to_coin = calculate_direction_to_nearest_coin_bfs(game_state)
+            # direction_to_coin = astar_search(game_state, manhattan_distance_heuristic)
+            if direction_to_coin:
+                return direction_to_coin
+            else:
+                return np.random.choice(ACTIONS)  # If no coin found, explore randomly
         else:
             # Choose the action using the Q-network
+            self.logger.debug("Choosing action using the Q-network.")
             state_features = state_to_features(game_state)
             state_tensor = torch.tensor(state_features, dtype=torch.float32)
             q_values = self.model(state_tensor)
@@ -64,7 +119,7 @@ def act(self, game_state: dict) -> str:
         state_tensor = torch.tensor(state_features, dtype=torch.float32)
         q_values = self.model(state_tensor)
         best_action_index = torch.argmax(q_values).item()
-        self.logger.info("chosen_action: " + str(best_action_index))
+        self.logger.info("[TEST] Chosen Action: " + str(best_action_index))
         return ACTIONS[best_action_index]
 
 
