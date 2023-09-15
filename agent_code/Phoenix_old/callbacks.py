@@ -4,7 +4,7 @@ import random
 import numpy as np
 import torch
 
-from agent_code.Phoenix.model import QNetwork
+from agent_code.Phoenix_old.model import QNetwork
 
 # Define your list of actions here
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT']
