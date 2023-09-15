@@ -11,7 +11,7 @@ Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 # Hyper parameters -- DO modify
-TRANSITION_HISTORY_SIZE = 3  # keep only ... last transitions
+TRANSITION_HISTORY_SIZE = 1000000  # keep only ... last transitions
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
 
 # Events
@@ -28,6 +28,11 @@ def setup_training(self):
     """
     # Example: Setup an array that will note transition tuples
     # (s, a, r, s')
+    # Set up training parameters
+    learning_rate = 0.001
+    batch_size = 64
+    self.model.initialize_training(learning_rate, batch_size)
+
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
 
 
