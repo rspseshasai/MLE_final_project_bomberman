@@ -6,7 +6,7 @@ from typing import List
 import matplotlib
 import numpy as np
 import torch
-from torch import nn
+from torch import nn, optim
 
 from .model import Phoenix
 
@@ -24,6 +24,7 @@ Transition = namedtuple('Transition',
 # Hyper parameters -- DO modify
 TRANSITION_HISTORY_SIZE = 1000000  # keep only ... last transitions
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
+ACTIONS_IDX = {'LEFT': 0, 'RIGHT': 1, 'UP': 2, 'DOWN': 3, 'WAIT': 4, 'BOMB': 5}
 
 # Events
 PLACEHOLDER_EVENT = "PLACEHOLDER"
@@ -33,32 +34,56 @@ def setup_training(self):
     self.score = 0
     self.game_score_arr = []
     self.episode_counter = 0
-    self.total_episodes = 1000
+    self.total_episodes = 200
     self.pos_saver = []
-    self.batch_size = 32
-    self.gamma = 0.5
+    self.gamma = 0.8
     self.learning_rate = 0.001
-    self.batch_size = 64
+    self.batch_size = 50
+    self.buffer_size = 200
+    self.epsilon_begin = 1.0
+    self.epsilon_end = 0.0001
+    self.epsilon_arr = generate_eps_greedy_policy(self)
+
+    self.loss_function = nn.MSELoss()
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
     self.loss_function = nn.MSELoss()
 
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
 
 
+def generate_eps_greedy_policy(self):
+    # __ANSATZ 1: Linear__#
+    # return np.linspace(network.epsilon_begin, network.epsilon_end, network.training_episodes)
+
+    # __ANSATZ 2: Linear + Const__#
+    N = self.total_episodes
+    N_1 = int(N * 0.7)
+    N_2 = N - N_1
+    eps1 = np.linspace(self.epsilon_begin, self.epsilon_end, N_1)
+    eps2 = np.ones(N_2) * self.epsilon_end
+    return np.append(eps1, eps2)
+
+
 def add_experience(self, old_game_state, self_action, new_game_state, events):
-    # Calculate rewards from events
-    reward = reward_from_events(self, events)
+    old_features = state_to_features(self, old_game_state)
+    if old_features is not None:
+        if new_game_state is None:
+            new_features = old_features
+        else:
+            new_features = state_to_features(self, new_game_state)
+        reward = reward_from_events(self, events)
+        reward += rewards_from_own_events(self, old_game_state, self_action, new_game_state, events)
 
-    # Calculate rewards from own events
-    reward += rewards_from_own_events(self, old_game_state, self_action, new_game_state, events)
+        action_idx = ACTIONS_IDX[self_action]
+        action = torch.zeros(6)
+        action[action_idx] = 1
 
-    # Convert game states to features
-    old_features = state_to_features(old_game_state)
-    new_features = state_to_features(new_game_state)
+        self.transitions.append((old_features, action, reward, new_features))
 
-    # Create a transition tuple (s, a, r, s') and add it to the experience buffer
-    transition = (old_features, action_to_index(self, self_action), reward, new_features)
-    self.transitions.append(transition)
+        # TODO
+        number_of_elements_in_buffer = len(self.transitions)
+        if number_of_elements_in_buffer > self.buffer_size:
+            self.transitions.popleft()
 
 
 def action_to_index(self, action):
@@ -80,34 +105,52 @@ def action_to_index(self, action):
 
 
 def update_model(self):
-    if len(self.transitions) >= self.batch_size:
-        # Sample a batch of transitions
-        batch = random.sample(self.transitions, self.batch_size)
-        states, actions, rewards, next_states = zip(*batch)
+    '''
+    model: the model that gets updated
+    experience_buffer: the collected experiences, list of game_episodes
+    '''
+    model = self.model
+    experience_buffer = self.transitions
 
-        # Convert to tensors
-        states = torch.stack([torch.tensor(s) for s in states])  # Convert NumPy arrays to PyTorch tensors
-        actions = torch.tensor(actions)
-        rewards = torch.tensor(rewards)
-        next_states = torch.stack([torch.tensor(s) for s in next_states])  # Convert NumPy arrays to PyTorch tensors
+    # randomly choose batch out of the experience buffer
+    number_of_elements_in_buffer = len(experience_buffer)
+    batch_size = min(number_of_elements_in_buffer, self.batch_size)
 
-        # Compute Q-values for the current and next states
-        current_q_values = self.model(states)
-        next_q_values = self.model(next_states)
+    random_i = [random.randrange(number_of_elements_in_buffer) for _ in range(batch_size)]
 
-        # Compute target Q-values using the Bellman equation
-        target_q_values = rewards + self.gamma * torch.max(next_q_values, dim=1).values
+    # compute for each experience in the batch
+    # - the Ys using n-step TD Q-learning
+    # - the current guess for the Q function
+    sub_batch = []
+    Y = []
+    for i in random_i:
+        random_experience = experience_buffer[i]
+        sub_batch.append(random_experience)
 
-        # Get the Q-values for the selected actions
-        selected_q_values = torch.gather(current_q_values, 1, actions.unsqueeze(1))
+    for b in sub_batch:
+        old_state = b[0]
+        action = b[1]
+        reward = b[2]
+        new_state = b[3]
 
-        # Calculate the loss using the mean squared error loss function
-        loss = torch.mean((selected_q_values - target_q_values.unsqueeze(1)) ** 2)
+        y = reward
+        if new_state is not None:
+            y += self.gamma * torch.max(model(new_state))
 
-        # Zero the gradients, perform backpropagation, and update the model
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        Y.append(y)
+
+    Y = torch.tensor(Y)
+
+    # Qs
+    states = torch.cat(tuple(b[0] for b in sub_batch))  # put all states of the sub_batch in one batch
+    q_values = model(states)
+    actions = torch.cat([b[1].unsqueeze(0) for b in sub_batch])
+    Q = torch.sum(q_values * actions, dim=1)
+
+    loss = self.loss_function(Q, Y)
+    self.optimizer.zero_grad()
+    loss.backward()
+    self.optimizer.step()
 
 
 def calculate_score(events):
@@ -137,18 +180,23 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
+
+    # add_experience(self, last_game_state, last_action, None, events)
+    # if len(self.experience_buffer) > 0:
+    #     update_network(self)
+
     self.score += calculate_score(events)
+
     plot_training_graph(self)
 
-    # 1. Add experience
-    add_experience(self, last_game_state, last_action, last_game_state, events)
+    add_experience(self, last_game_state, last_action, None, events)
+    if len(self.transitions) > 0:
+        update_model(self)
 
-    # 2. Update the model
-    update_model(self)
-
-    # Store the model
-    with open("saved/my-phoenix-model.pt", "wb") as file:
-        pickle.dump(self.model, file)
+    self.episode_counter += 1
+    if self.episode_counter % (self.total_episodes // 10) == 0:  # save parameters 2 times
+        print("\nsaving to phoenix.pt " + "my-phoenix-model")
+        torch.save(self.model.state_dict(), f"saved/my-phoenix-model.pt")
 
 
 def reward_from_events(self, events) -> int:

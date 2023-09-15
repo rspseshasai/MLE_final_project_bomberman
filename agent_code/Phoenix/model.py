@@ -3,20 +3,23 @@ import torch.nn as nn
 
 
 class Phoenix(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self):
         super(Phoenix, self).__init__()
-        self.input_features = 1734
-        self.hidden_features = 246
-        self.output_features = 6
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        # Define the layers of the neural network
-        self.output_layer = nn.Linear(hidden_size, output_size)
+
+        self.number_of_in_features = 4
+        self.number_of_actions = 6
+
+        # LAYERS
+        # self.dense1 = nn.Linear(in_features=self.number_of_in_features, out_features=24)
+        # self.dense2 = nn.Linear(in_features=24, out_features=36)
+
+        # self.dense3 = nn.Linear(in_features=36, out_features=27)
+        self.out = nn.Linear(in_features=self.number_of_in_features, out_features=self.number_of_actions)
 
     def forward(self, x):
-        x = x.float()  # Cast the input tensor to float if it's not already
-        x = torch.relu(self.fc1(x))
-        x = self.output_layer(x)
-        return x
+        out = self.out(x)
+
+        return out
 
     def initialize_training(self, learning_rate, batch_size):
         # Set up training parameters

@@ -4,10 +4,10 @@ import random
 import numpy as np
 import torch
 
-from agent_code.Phoenix_old.model import QNetwork
+from agent_code.Phoenix_very_old.model import QNetwork
 
 # Define your list of actions here
-ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT']
+ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
 
 def setup(self):
@@ -25,7 +25,7 @@ def setup(self):
     :param self: This object is passed to all callbacks, and you can set arbitrary values.
     """
 
-    if self.train or not os.path.isfile("my-saved-model.pt"):
+    if self.train or not os.path.isfile("saved_models/my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
 
         # Initialize your Q-network here
@@ -93,26 +93,34 @@ def act(self, game_state: dict) -> str:
     self.logger.debug("Querying model for action.")
 
     if self.train:
-        epsilon = 0.4  # Initial exploration rate, adjust as needed
-        if random.random() < epsilon:
-            self.logger.debug("Choosing action with exploration.")
-            # Combine exploration with moving towards the nearest coin
-            direction_to_coin = calculate_direction_to_nearest_coin_bfs(game_state)
-            # direction_to_coin = astar_search(game_state, manhattan_distance_heuristic)
-            if direction_to_coin:
-                return direction_to_coin
+        eps = self.epsilon_arr[self.episode_counter]
+        if random.random() <= eps:  # choose random action
+
+            rand_num = random.random()
+            if rand_num < 0.8:
+                self.logger.debug("Choosing action with exploration.")
+                # Combine exploration with moving towards the nearest coin
+                direction_to_coin = calculate_direction_to_nearest_coin_bfs(game_state)
+                # direction_to_coin = astar_search(game_state, manhattan_distance_heuristic)
+                if direction_to_coin:
+                    return direction_to_coin
+                else:
+                    return np.random.choice(ACTIONS)  # If no coin found, explore randomly
+            elif rand_num < 0.9:
+                return "BOMB"
+            # 10% of the time, return WAIT action
             else:
-                return np.random.choice(ACTIONS)  # If no coin found, explore randomly
-        else:
-            # Choose the action using the Q-network
-            self.logger.debug("Choosing action using the Q-network.")
-            state_features = state_to_features(game_state)
-            state_tensor = torch.tensor(state_features, dtype=torch.float32)
-            q_values = self.model(state_tensor)
-            action_probabilities = torch.softmax(q_values, dim=0)
-            action_index = torch.multinomial(action_probabilities, 1).item()
-            chosen_action = ACTIONS[action_index]
-            return chosen_action
+                return "WAIT"
+
+        # Choose the action using the Q-network
+        self.logger.debug("Choosing action using the Q-network.")
+        state_features = state_to_features(game_state)
+        state_tensor = torch.tensor(state_features, dtype=torch.float32)
+        q_values = self.model(state_tensor)
+        action_probabilities = torch.softmax(q_values, dim=0)
+        action_index = torch.multinomial(action_probabilities, 1).item()
+        chosen_action = ACTIONS[action_index]
+        return chosen_action
     else:
         # In testing mode, choose the action with the highest Q-value
         state_features = state_to_features(game_state)
