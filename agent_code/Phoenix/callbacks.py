@@ -3,6 +3,7 @@ import pickle
 import random
 
 import numpy as np
+import torch
 
 from agent_code.Phoenix.model import Phoenix
 
@@ -23,16 +24,18 @@ def setup(self):
 
 def act(self, game_state: dict) -> str:
 
-    # todo Exploration vs exploitation
-    random_prob = .1
-    if self.train and random.random() < random_prob:
-        self.logger.debug("Choosing action purely at random.")
-        # Implement random action selection during training
-        # Example: return np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
+    if self.train:  # Exploration vs exploitation
+        if random.random() <= 0.3:  # Choose a random action for exploration
+            return np.random.choice(ACTIONS, p=[0.2, 0.2, 0.2, 0.2, 0.1, 0.1])  # Exploration probabilities
 
-    self.logger.debug("Querying model for action.")
-    # Implement your model-based action selection here
-    # Example: return self.model.select_action(game_state)
+    features = state_to_features(game_state)
+    Q = self.network(features)
+    action_prob = np.array(torch.softmax(Q, dim=1).detach().squeeze())
+    best_action = ACTIONS[np.argmax(action_prob)]
+
+    self.logger.debug("Action selected: " + best_action)
+    return best_action
+
 
 
 def state_to_features(game_state: dict) -> np.array:
