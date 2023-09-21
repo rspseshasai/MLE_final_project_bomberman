@@ -36,7 +36,7 @@ def setup(self):
         self.model = QNetwork(input_size, hidden_size, output_size)
     else:
         self.logger.info("Loading model from saved state.")
-        with open("my-saved-model.pt", "rb") as file:
+        with open("saved_models/my-saved-model.pt", "rb") as file:
             self.model = pickle.load(file)
 
 

@@ -145,7 +145,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
             optimizer.step()
 
             # Save the model after training if needed
-            with open("my-saved-model.pt", "wb") as file:
+            with open("saved_models/my-saved-model.pt", "wb") as file:
                 pickle.dump(q_network, file)
 
 
@@ -223,7 +223,7 @@ def plot_training_graph(self, smooth=False):
     ax.set_ylabel('total points')
     ax.plot(x, y, marker='o', markersize=3, linewidth=1)
 
-    plt.savefig('training_progress.png')
+    plt.savefig('saved_models/training_progress.png')
 
     plt.close()
 
