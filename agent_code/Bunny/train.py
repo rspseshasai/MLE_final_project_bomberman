@@ -10,17 +10,13 @@ from agent_code.Bunny.features import state_to_features
 from .model import QLearningAgent
 
 # Hyperparameters
-TRANSITION_HISTORY_SIZE = 3
-RECORD_ENEMY_TRANSITIONS = 1.0
-PLACEHOLDER_EVENT = "PLACEHOLDER"
-
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
 # TODO: Remove hard coding this value
-TOTAL_EPISODES = 7000
-LINEAR_CONSTANT_QUOTIENT = 0.9
-EPSILON = (0.9, 0.4)
+TOTAL_EPISODES = 1000
+LINEAR_CONSTANT_QUOTIENT = 0.85
+EPSILON = (0.6, 0.2)
 
 
 def setup_training(self):
@@ -37,8 +33,7 @@ def setup_training(self):
     self.episode_counter = 0
     # Hyperparameters
     self.q_learning_agent.LEARNING_RATE = 0.001
-    self.q_learning_agent.EXPLORATION_PROB = 0.1
-    self.q_learning_agent.DISCOUNT_FACTOR = 0.9
+    self.q_learning_agent.DISCOUNT_FACTOR = 0.85
     self.q_learning_agent.optimizer = optim.Adam(self.q_learning_agent.q_network.parameters(),
                                                  lr=self.q_learning_agent.LEARNING_RATE)
     self.epsilon_begin = EPSILON[0]
@@ -182,7 +177,7 @@ def reward_from_events(self, events: List[str]) -> int:
         e.MOVED_UP: -1,
         e.MOVED_DOWN: -1,
         e.WAITED: -1,
-        e.INVALID_ACTION: -10,
+        e.INVALID_ACTION: -100,
         e.BOMB_DROPPED: -1,
         e.KILLED_SELF: 0,
         e.GOT_KILLED: -700,

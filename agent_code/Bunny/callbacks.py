@@ -69,20 +69,20 @@ def act(self, game_state: dict) -> str:
         # TODO: Paraphrase below epsilon code
         random_prob = self.epsilon_arr[self.episode_counter]
         if random.random() <= random_prob:
-            # if random_prob > 0.1:
-            #     if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
-            #         action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
-            #         self.logger.info(f"Choose action {action} completely at random")
-            #         print(f"Choose action {action} completely at random")
-            #     else:
-            action = random_clever_move(self, game_state)
-            self.logger.info(f"Select action {action} after the rule-based agent.")
-            # print(f"Select action {action} after the rule-based agent.")
+            if random_prob > 0.1:
+                if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
+                    action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
+                    self.logger.info(f"Choose action {action} completely at random")
+                    # print(f"Choose action {action} completely at random")
+                else:
+                    action = random_clever_move(self, game_state)
+                    self.logger.info(f"Select action {action} after the rule-based agent.")
+                    # print(f"Select action {action} after the rule-based agent.")
 
-            action_wait = wait_if_bomb_or_explosion(self, game_state, action)
-            if action_wait is not None:
-                return action_wait
-            return action
+                    action_wait = wait_if_bomb_or_explosion(self, game_state, action)
+                    if action_wait is not None:
+                        return action_wait
+                    return action
 
         self.logger.debug("Querying model for action.")
         # Use the Q-learning agent to choose the action
@@ -109,16 +109,13 @@ def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
 
     # Check if the next position has a positive value in the explosion map
     explosion_map = game_state["explosion_map"]
-    if explosion_map[next_position[1]][next_position[0]] > 0:
+    if explosion_map[next_position[0]][next_position[1]] > 0:
         return True
 
     return False
 
 
 def get_best_move(self, game_state: dict) -> str:
-    if self.train and random.random() < self.q_learning_agent.EXPLORATION_PROB:
-        return np.random.choice(ACTIONS)
-
     state = state_to_features(game_state)
     q_values = self.q_learning_agent.q_network(state)
     q_values_array = q_values.detach().numpy()
