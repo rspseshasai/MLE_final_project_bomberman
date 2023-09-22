@@ -1,6 +1,7 @@
 from typing import List
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch.optim as optim
 from scipy.ndimage import uniform_filter1d
 
@@ -16,7 +17,10 @@ PLACEHOLDER_EVENT = "PLACEHOLDER"
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
-total_episodes = 0
+# TODO: Remove hard coding this value
+TOTAL_EPISODES = 7000
+LINEAR_CONSTANT_QUOTIENT = 0.9
+EPSILON = (0.9, 0.4)
 
 
 def setup_training(self):
@@ -30,13 +34,36 @@ def setup_training(self):
 
     # Initialize a Q-learning agent instance with PyTorch
     self.q_learning_agent = QLearningAgent()
-
+    self.episode_counter = 0
     # Hyperparameters
     self.q_learning_agent.LEARNING_RATE = 0.001
     self.q_learning_agent.EXPLORATION_PROB = 0.1
     self.q_learning_agent.DISCOUNT_FACTOR = 0.9
     self.q_learning_agent.optimizer = optim.Adam(self.q_learning_agent.q_network.parameters(),
                                                  lr=self.q_learning_agent.LEARNING_RATE)
+    self.epsilon_begin = EPSILON[0]
+    self.epsilon_end = EPSILON[1]
+    self.training_episodes = TOTAL_EPISODES
+    self.epsilon_arr = generate_eps_greedy_policy(self, LINEAR_CONSTANT_QUOTIENT)
+
+
+def generate_eps_greedy_policy(self, q):
+    '''
+    :param self: the network that is used for training
+            (contains eps-threshold for start and end of training
+            and the number of total episodes)
+    :param q: the fraction of the training where the eps-threshold is linearly diminished
+
+    returns: array containing the eps-thresholds for training
+    '''
+    N = self.training_episodes
+    N_1 = int(N * q)
+    N_2 = N - N_1
+    eps1 = np.linspace(self.epsilon_begin, self.epsilon_end, N_1)
+    if N_1 == N:
+        return eps1
+    eps2 = np.ones(N_2) * self.epsilon_end
+    return np.append(eps1, eps2)
 
 
 def calculate_round_score(events: List[str]) -> int:
@@ -55,7 +82,6 @@ def calculate_round_score(events: List[str]) -> int:
 
 
 def track_game_score(self, smooth=False):
-    global total_episodes
     global scores_per_round
     global game_score_arr
 
@@ -64,7 +90,7 @@ def track_game_score(self, smooth=False):
     scores_per_round = []
     y = game_score_arr
     if smooth:
-        window_size = total_episodes // 25
+        window_size = self.episode_counter // 25
         if window_size < 1:
             window_size = 1
         y = uniform_filter1d(y, window_size, mode="nearest", output="float")
@@ -101,9 +127,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     round_score = calculate_round_score(events)
     scores_per_round.append(round_score)  # Store the round score
-
-    global total_episodes
-    total_episodes += 1
+    self.episode_counter += 1
     track_game_score(self)
 
 

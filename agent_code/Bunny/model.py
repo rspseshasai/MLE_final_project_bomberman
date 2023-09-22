@@ -45,16 +45,17 @@ class QLearningAgent:
         # Define a dictionary to map action strings to indices
         action_to_index = {'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3, 'BOMB': 4, 'WAIT': 5}
 
-        # Convert the action string to its index
-        action_index = action_to_index[action]
+        if action is not None:
+            # Convert the action string to its index
+            action_index = action_to_index[action]
 
-        # Calculate the loss (Mean Squared Error)
-        loss = torch.mean((q_values[0, action_index] - target_q_value) ** 2)
+            # Calculate the loss (Mean Squared Error)
+            loss = torch.mean((q_values[0, action_index] - target_q_value) ** 2)
 
-        # Optimize the model
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+            # Optimize the model
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
     def save_model(self, filename):
         torch.save(self.q_network.state_dict(), filename)
