@@ -63,7 +63,7 @@ def act(self, game_state: dict) -> str:
     :param game_state: The dictionary that describes everything on the board.
     :return: The action to take as a string.
     """
-    self.features = state_to_features(game_state)
+    self.features = state_to_features(self, game_state)
     if self.train:
         # Training mode: Perform exploration and exploitation
         # TODO: Paraphrase below epsilon code
@@ -84,8 +84,8 @@ def act(self, game_state: dict) -> str:
                         return action_wait
                     return action
 
-        self.logger.debug("Querying model for action.")
         # Use the Q-learning agent to choose the action
+        self.logger.debug("Querying model for action.")
     else:
         # Testing mode: Already loaded the model during setup
         self.logger.debug("Using model for action.")
@@ -116,7 +116,7 @@ def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
 
 
 def get_best_move(self, game_state: dict) -> str:
-    state = state_to_features(game_state)
+    state = state_to_features(self, game_state)
     q_values = self.q_learning_agent.q_network(state)
     q_values_array = q_values.detach().numpy()
     best_action_index = np.argmax(q_values_array)

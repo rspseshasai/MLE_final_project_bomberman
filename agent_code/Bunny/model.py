@@ -8,7 +8,7 @@ class QNetwork(nn.Module):
     def __init__(self):
         super(QNetwork, self).__init__()
 
-        self.input_dim = 23
+        self.input_dim = 21
         self.output_dim = len(ACTIONS)
 
         self.fc1 = nn.Linear(self.input_dim, 128)
@@ -43,7 +43,7 @@ class QLearningAgent:
             target_q_value = reward
 
         # Define a dictionary to map action strings to indices
-        action_to_index = {'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3, 'BOMB': 4, 'WAIT': 5}
+        action_to_index = {'UP': 0, 'DOWN': 1, 'LEFT': 2, 'RIGHT': 3, 'WAIT': 4, 'BOMB': 5}
 
         if action is not None:
             # Convert the action string to its index
