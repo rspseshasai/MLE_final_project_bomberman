@@ -64,15 +64,14 @@ def act(self, game_state: dict) -> str:
     self.features = state_to_features(game_state)
     if self.train:
         # Training mode: Perform exploration and exploitation
-        # TODO: Paraphrase below epsilon code
+
         random_prob = self.epsilon_arr[self.episode_counter]
         if random.random() <= random_prob:
             if random_prob > 0.1:
                 if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
                     action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
                     self.logger.info(f"Choose action {action} completely at random")
-                    #print(f"Choose action {action} completely at random")
-                    # TODO: check above if code
+
                 else:
                     action = random_clever_move(self, game_state)
                     self.logger.info(f"Select action {action} after the rule-based agent.")
@@ -202,7 +201,6 @@ def run_away_from_explosion(self, game_state: dict) -> str:
     # Choose a random safe position to move to
     return random.choice(safe_positions)
 
-#TODO: change algo
 def move_to_nearest_crate(self, game_state: dict) -> str:
     # Get the agent's current position
     current_position = game_state["self"][3]
