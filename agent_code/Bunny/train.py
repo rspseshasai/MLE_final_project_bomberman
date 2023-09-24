@@ -13,9 +13,9 @@ from .model import QLearningAgent
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
-TOTAL_ROUNDS = 100
+TOTAL_ROUNDS = 10000
 LINEAR_CONSTANT_QUOTIENT = 0.85
-EPSILON = (0.6, 0.3)
+EPSILON = (0.6, 0.2)
 
 
 def setup_training(self):
