@@ -1,9 +1,10 @@
 import os
 import random
+import torch
 import numpy as np
 from .model import DQNAgent  # Import the DQNAgent class with PyTorch
 from .features import state_to_features
-
+from queue import PriorityQueue
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
@@ -48,34 +49,34 @@ def wait_if_bomb_or_explosion(self, game_state, action):
     bomb_positions = get_bomb_positions(game_state)
     if not is_position_in_bomb_range(position, bomb_positions):
         if is_position_in_bomb_range(next_position, bomb_positions):
-            # print("Bomb waiting")
             return "WAIT"
 
 
-def act(self, game_state: dict) -> str:
-    """
-    Your agent should parse the input, think, and take a decision.
-    When not in training mode, the maximum execution time for this method is 0.5s.
+def softmax_action_selection(q_values, temperature):
+    exp_values = np.exp(q_values / temperature)
+    action_probs = exp_values / exp_values.sum()
+    return action_probs
 
-    :param self: The same object that is passed to all of your callbacks.
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
+def act(self, game_state: dict) -> str:
+    self.temperature = torch.tensor(1.0, dtype=torch.float32)
     self.features = state_to_features(game_state)
     if self.train:
         # Training mode: Perform exploration and exploitation
-
         random_prob = self.epsilon_arr[self.episode_counter]
         if random.random() <= random_prob:
             if random_prob > 0.1:
-                if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
-                    action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
-                    self.logger.info(f"Choose action {action} completely at random")
-
-                else:
-                    action = random_clever_move(self, game_state)
-                    self.logger.info(f"Select action {action} after the rule-based agent.")
-                    #print(f"Select action {action} after the rule-based agent.")
+                # Use Softmax Action Selection for exploration
+                q_values = self.dqn_agent.q_network(self.features)
+                exp_values = np.exp((q_values / self.temperature).detach().numpy())
+                action_probs = exp_values / exp_values.sum()
+                action_probs = action_probs.flatten()
+                # Normalize the probabilities to sum to 1
+                action_probs /= np.sum(action_probs)
+                action = np.random.choice(ACTIONS, p=action_probs)
+                self.logger.info(f"Choose action {action} using Softmax Action Selection")
+            else:
+                action = random_clever_move(self, game_state)
+                self.logger.info(f"Select action {action} after the rule-based agent.")
 
             action_wait = wait_if_bomb_or_explosion(self, game_state, action)
             if action_wait is not None:
@@ -83,12 +84,49 @@ def act(self, game_state: dict) -> str:
             return action
 
         self.logger.debug("Querying model for action.")
-        # Use the DQN agent to choose the action
     else:
         # Testing mode: Already loaded the model during setup
         self.logger.debug("Using model for action.")
 
     return get_best_move(self, game_state)
+
+
+# def act(self, game_state: dict) -> str:
+#     """
+#     Your agent should parse the input, think, and take a decision.
+#     When not in training mode, the maximum execution time for this method is 0.5s.
+#
+#     :param self: The same object that is passed to all of your callbacks.
+#     :param game_state: The dictionary that describes everything on the board.
+#     :return: The action to take as a string.
+#     """
+#     self.features = state_to_features(game_state)
+#     if self.train:
+#         # Training mode: Perform exploration and exploitation
+#         #TODO: change epsilon
+#         random_prob = self.epsilon_arr[self.episode_counter]
+#         if random.random() <= random_prob:
+#             if random_prob > 0.1:
+#                 if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
+#                     action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
+#                     self.logger.info(f"Choose action {action} completely at random")
+#
+#                 else:
+#                     action = random_clever_move(self, game_state)
+#                     self.logger.info(f"Select action {action} after the rule-based agent.")
+#
+#             action_wait = wait_if_bomb_or_explosion(self, game_state, action)
+#             if action_wait is not None:
+#                 return action_wait
+#             return action
+#
+#         self.logger.debug("Querying model for action.")
+#         # Use the DQN agent to choose the action
+#     else:
+#         # Testing mode: Already loaded the model during setup
+#         self.logger.debug("Using model for action.")
+#
+#     return get_best_move(self, game_state)
 
 
 def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
@@ -459,7 +497,6 @@ def collect_coins(self, game_state: dict) -> str:
     return move_towards_target(self, current_position, nearest_coin, game_state)
 
 
-from queue import PriorityQueue
 def minkowski_distance(position1, position2, p=1):
     """
     Calculate the Minkowski distance between two positions.

@@ -1,18 +1,13 @@
 from agent_code.agent007_remake.features import state_to_features
 from .model import DQNAgent
 from typing import List
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.optim as optim
 from scipy.ndimage import uniform_filter1d
-
 import events as e
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
-TRANSITION_HISTORY_SIZE = 3
-RECORD_ENEMY_TRANSITIONS = 1.0
-PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 # Initialize variables for tracking training progress
 scores_per_round = []
@@ -21,6 +16,9 @@ game_score_arr = []
 TOTAL_EPISODES = 5000
 LINEAR_CONSTANT_QUOTIENT = 0.9
 EPSILON = (0.9, 0.4)
+TRANSITION_HISTORY_SIZE = 3
+RECORD_ENEMY_TRANSITIONS = 1.0
+PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 def setup_training(self):
     # Initialize a DQN agent instance
