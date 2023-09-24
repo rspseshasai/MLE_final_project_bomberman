@@ -1,89 +1,41 @@
 import os
 import random
+from queue import PriorityQueue
 
 import numpy as np
 
 from .features import state_to_features
-from .model import QLearningAgent  # Import the QLearningAgent class with PyTorch
+from .model import QLearningAgent
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
 
 def setup(self):
-    """
-    Setup your code. This is called once when loading each agent.
-    Make sure that you prepare everything such that act(...) can be called.
-
-    When in training mode, the separate `setup_training` in train.py is called
-    after this method. This separation allows you to share your trained agent
-    with other students, without revealing your training code.
-
-    In this example, our model is a set of probabilities over actions
-    that are independent of the game state.
-
-    :param self: This object is passed to all callbacks and you can set arbitrary values.
-    """
-    if self.train or not os.path.isfile("saved_parameters/my-saved-model.pt"):
+    if self.train or not os.path.isfile("saved_parameters/model.pt"):
         self.logger.info("Setting up model from scratch.")
         weights = np.random.rand(len(ACTIONS))
         self.model = weights / weights.sum()
-        # Initialize the QLearningAgent instance with PyTorch in training mode
         self.q_learning_agent = QLearningAgent()
     else:
         self.logger.info("Loading model from saved state.")
-        # Create a QLearningAgent instance with PyTorch
         self.q_learning_agent = QLearningAgent()
-        # Load the trained model
-        self.q_learning_agent.load_model("saved_parameters/my-saved-model.pt")
-
-
-def wait_if_bomb_or_explosion(self, game_state, action):
-    # Check if the selected action leads to an explosion
-    if will_run_into_explosion(self, game_state, action):
-        # print("Selected action leads to an explosion. Waiting instead.")
-        self.logger.info("Selected action leads to an explosion. Waiting instead.")
-        return "WAIT"
-
-    position = game_state["self"][3]
-    # Calculate the next position based on the selected action
-    next_position = get_next_position(position, action)
-    bomb_positions = get_bomb_positions(game_state)
-    if not is_position_in_bomb_range(position, bomb_positions):
-        if is_position_in_bomb_range(next_position, bomb_positions):
-            # print("Bomb waiting")
-            return "WAIT"
+        self.q_learning_agent.load_model("saved_parameters/model.pt")
 
 
 def act(self, game_state: dict) -> str:
-    """
-    Your agent should parse the input, think, and take a decision.
-    When not in training mode, the maximum execution time for this method is 0.5s.
-
-    :param self: The same object that is passed to all of your callbacks.
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
     self.features = state_to_features(self, game_state)
     if self.train:
         # Training mode: Perform exploration and exploitation
-        # TODO: Paraphrase below epsilon code
-        random_prob = self.epsilon_arr[self.episode_counter]
+        random_prob = self.epsilon_range[self.episode_counter]
         if random.random() <= random_prob:
-            if random_prob > 0.1:
-                if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
-                    action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
-                    self.logger.info(f"Choose action {action} completely at random")
-                    # print(f"Choose action {action} completely at random")
-                else:
-                    action = random_clever_move(self, game_state)
-                    self.logger.info(f"Select action {action} after the rule-based agent.")
-                    # print(f"Select action {action} after the rule-based agent.")
+            action = random_clever_move(self, game_state)
+            self.logger.info(f"Select action {action} after the rule-based agent.")
+            # print(f"Select action {action} after the rule-based agent.")
 
-                    action_wait = wait_if_bomb_or_explosion(self, game_state, action)
-                    if action_wait is not None:
-                        return action_wait
-                    return action
-
+            action_wait = wait_if_bomb_or_explosion(self, game_state, action)
+            if action_wait is not None:
+                return action_wait
+            return action
         # Use the Q-learning agent to choose the action
         self.logger.debug("Querying model for action.")
     else:
@@ -91,39 +43,6 @@ def act(self, game_state: dict) -> str:
         self.logger.debug("Using model for action.")
 
     return get_best_move(self, game_state)
-
-
-def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
-    """
-    Check if the selected action will lead the agent into an explosion.
-
-    :param game_state: The dictionary that describes everything on the board.
-    :param action: The selected action as a string.
-    :return: True if the action leads to an explosion, False otherwise.
-    """
-    # Get the agent's current position
-    position = game_state["self"][3]
-
-    # Calculate the next position based on the selected action
-    next_position = get_next_position(position, action)
-
-    # Check if the next position has a positive value in the explosion map
-    explosion_map = game_state["explosion_map"]
-    if explosion_map[next_position[0]][next_position[1]] > 0:
-        return True
-
-    return False
-
-
-def get_best_move(self, game_state: dict) -> str:
-    state = state_to_features(self, game_state)
-    q_values = self.q_learning_agent.q_network(state)
-    q_values_array = q_values.detach().numpy()
-    best_action_index = np.argmax(q_values_array)
-    best_action = ACTIONS[best_action_index]
-    self.logger.info(f"Predicted action {best_action} by our QNet model.")
-    # print(f"Predicted action {best_action} by our QNet model.")
-    return best_action
 
 
 def random_clever_move(self, game_state: dict) -> str:
@@ -156,6 +75,49 @@ def random_clever_move(self, game_state: dict) -> str:
 
     else:
         return move_to_nearest_crate(self, game_state)  # Move towards the nearest crate
+
+
+def wait_if_bomb_or_explosion(self, game_state, action):
+    # Check if the selected action leads to an explosion
+    if will_run_into_explosion(self, game_state, action):
+        # print("Selected action leads to an explosion. Waiting instead.")
+        self.logger.info("Selected action leads to an explosion. Waiting instead.")
+        return "WAIT"
+
+    position = game_state["self"][3]
+    # Calculate the next position based on the selected action
+    next_position = get_next_position(position, action)
+    bomb_positions = get_bomb_positions(game_state)
+    if not is_position_in_bomb_range(position, bomb_positions):
+        if is_position_in_bomb_range(next_position, bomb_positions):
+            # print("Bomb waiting")
+            return "WAIT"
+
+
+def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
+    # Get the agent's current position
+    position = game_state["self"][3]
+
+    # Calculate the next position based on the selected action
+    next_position = get_next_position(position, action)
+
+    # Check if the next position has a positive value in the explosion map
+    explosion_map = game_state["explosion_map"]
+    if explosion_map[next_position[0]][next_position[1]] > 0:
+        return True
+
+    return False
+
+
+def get_best_move(self, game_state: dict) -> str:
+    state = state_to_features(self, game_state)
+    q_values = self.q_learning_agent.q_network(state)
+    q_values_array = q_values.detach().numpy()
+    best_action_index = np.argmax(q_values_array)
+    best_action = ACTIONS[best_action_index]
+    self.logger.info(f"Predicted action {best_action} by our QNet model.")
+    # print(f"Predicted action {best_action} by our QNet model.")
+    return best_action
 
 
 def should_run_away_from_explosion(self, game_state: dict) -> bool:
@@ -263,43 +225,6 @@ def move_to_nearest_crate(self, game_state: dict) -> str:
                     open_set.put((f_score, neighbor))
 
     return "WAIT"  # Default to waiting if no path is found
-
-
-def is_crate_blocking_path(self, game_state: dict) -> bool:
-    """
-    Check if there is a crate blocking the path to collect coins.
-
-    :param game_state: The dictionary that describes everything on the board.
-    :return: True if a crate is blocking the path, False otherwise.
-    """
-    coins = game_state["coins"]
-    position = game_state["self"][3]
-
-    # Check if there are coins to collect
-    if not coins:
-        return False
-
-    # Find the nearest coin
-    nearest_coin = min(coins, key=lambda c: abs(position[0] - c[0]) + abs(position[1] - c[1]))
-
-    # Check if there is a crate blocking the path to the nearest coin
-    if nearest_coin:
-        dx, dy = nearest_coin[0] - position[0], nearest_coin[1] - position[1]
-        next_position = get_next_position(position, "")
-        if dx < 0:
-            next_position[0] -= 1
-        elif dx > 0:
-            next_position[0] += 1
-        elif dy < 0:
-            next_position[1] -= 1
-        elif dy > 0:
-            next_position[1] += 1
-
-        # Check if the next position contains a crate
-        if game_state["field"][next_position] == 1:
-            return True
-
-    return False
 
 
 def is_crate_nearby(self, game_state: dict) -> bool:
@@ -461,9 +386,6 @@ def collect_coins(self, game_state: dict) -> str:
 
     # Determine the action that moves the agent towards the nearest coin
     return move_towards_target(self, current_position, nearest_coin, game_state)
-
-
-from queue import PriorityQueue
 
 
 def manhattan_distance(position1, position2):

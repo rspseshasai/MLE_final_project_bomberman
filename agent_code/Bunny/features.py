@@ -9,6 +9,81 @@ FREE, CRATE, WALL, BOMB, COIN, OPPONENT = 0, 1, -1, 2, 3, 4
 ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "WAIT", "BOMB"]
 
 
+def is_valid_move(new_position, field):
+    x, y = new_position
+    return 0 <= x < len(field) and 0 <= y < len(field[0]) and field[x][y] != WALL
+
+
+def is_in_bomb_range(position, bombs):
+    for (x, y), countdown in bombs:
+        if x == position[0] and abs(y - position[1]) <= 3:
+            return True
+        if y == position[1] and abs(x - position[0]) <= 3:
+            return True
+    return False
+
+
+def find_safe_tiles(current_position, bomb_range, field, bombs):
+    safe_tiles = set()
+
+    for dx in range(-bomb_range, bomb_range + 1):
+        for dy in range(-bomb_range, bomb_range + 1):
+            x, y = current_position[0] + dx, current_position[1] + dy
+            new_position = (x, y)
+
+            if is_valid_move(new_position, field) and not any(
+                    (x, y) == new_position
+                    for (x, y), countdown in bombs
+            ):
+                if field[new_position] != CRATE and field[new_position] != WALL and not is_in_bomb_range(
+                        new_position, bombs):
+                    safe_tiles.add(new_position)
+
+    return safe_tiles
+
+
+def shortest_path_to_safety(current_position, bomb_range, field, bombs):
+    if not is_valid_move(current_position, field):
+        return float('inf')  # Current position is a wall, no safe path
+
+    safe_tiles = find_safe_tiles(current_position, bomb_range, field, bombs)
+    if not safe_tiles:
+        return float('inf')  # No safe tiles nearby
+
+    shortest_distance = float('inf')
+
+    for safe_tile in safe_tiles:
+        visited = set()
+        queue = [(0, current_position)]
+        path = []  # Store the path
+
+        while queue:
+            steps, current = heapq.heappop(queue)
+
+            if current in visited:
+                continue
+
+            visited.add(current)
+            if field[current] == CRATE or field[current] == WALL:
+                continue
+            path.append(current)  # Add the current position to the path
+
+            if current == safe_tile:
+                if steps < shortest_distance:
+                    shortest_distance = steps
+                break
+
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                x, y = current[0] + dx, current[1] + dy
+                new_position = (x, y)
+
+                if is_valid_move(new_position, field) and new_position not in visited:
+                    heapq.heappush(queue, (steps + 1, new_position))
+
+    # print(f"Shortest path to safety: {shortest_path}")  # Print the shortest path
+    return shortest_distance
+
+
 # Define function to check if a position is valid (within the game board)
 def is_valid_position(position, field):
     x, y = position
@@ -168,164 +243,6 @@ def crate_features(game_state):
     return crate_features
 
 
-# Define function to calculate bomb features if placed at the current position
-def bomb_features(game_state):
-    position = game_state["self"][3]
-    field = game_state["field"]
-    opponents = game_state["others"]
-    bombs = game_state["bombs"]
-    bomb_range = 3  # Constant bomb range
-
-    def count_destroyed_crates(position):
-        destroyed_crates = 0
-
-        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-            for i in range(1, bomb_range + 1):
-                x, y = position[0] + dx * i, position[1] + dy * i
-                if not is_valid_position((x, y), field) or field[x][y] == WALL:
-                    break  # Stop if we encounter a wall
-                if field[x][y] == CRATE:
-                    destroyed_crates += 1
-
-        return destroyed_crates
-
-    def count_killed_opponents(position):
-        killed_opponents = 0
-
-        for opponent in opponents:
-            if opponent[0] == position:
-                killed_opponents += 1
-
-        return killed_opponents
-
-    def is_safe_path_to_escape(position, bomb_range):
-        visited = np.zeros_like(field, dtype=bool)
-        queue = [position]
-
-        while queue:
-            x, y = queue.pop(0)
-
-            if visited[x][y]:
-                continue
-
-            visited[x][y] = True
-
-            if field[x][y] == WALL:
-                continue  # Skip walls
-
-            if any((x, y) == bomb[0] for bomb in bombs):
-                continue  # Skip bomb positions
-
-            if bomb_range == 0:
-                return True  # Reached a safe tile
-
-            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                new_x, new_y = x + dx, y + dy
-
-                if is_valid_position((new_x, new_y), field) and not visited[new_x][new_y]:
-                    queue.append((new_x, new_y))
-
-        return False  # No safe path to escape
-
-    destroyed_crates = count_destroyed_crates(position)
-    killed_opponents = count_killed_opponents(position)
-
-    bomb_effect = destroyed_crates + 10 * killed_opponents
-
-    # Check if the bomb can't destroy anything or if there is no safe path to escape
-    if bomb_effect == 0 or not is_safe_path_to_escape(position, bomb_range):
-        return [-1]
-    else:
-        return [bomb_effect]
-
-
-# Define function to calculate safety features
-def safety_features(game_state):
-    position = game_state["self"][3]
-    field = game_state["field"]
-    explosion_map = game_state["explosion_map"]
-
-    safety_features = []
-
-    directions = ["RIGHT", "LEFT", "DOWN", "UP"]
-
-    for direction in directions:
-        dx, dy = 0, 0
-
-        if direction == "RIGHT":
-            dx = 1
-        elif direction == "LEFT":
-            dx = -1
-        elif direction == "DOWN":
-            dy = 1
-        elif direction == "UP":
-            dy = -1
-
-        new_position = (position[0] + dx, position[1] + dy)
-
-        if not is_valid_position(new_position, field) or field[new_position[0]][new_position[1]] == WALL:
-            safety_features.append(-1)  # No path due to crates or walls
-        else:
-            # Check if the path is safe using the explosion map
-            if explosion_map[new_position[0]][new_position[1]] == 0:
-                safety_features.append(0)  # No explosion, but no safe path either
-            else:
-                # Calculate the steps required to go to the nearest safe tile
-                steps = 0
-                current_position = new_position
-                while explosion_map[current_position[0]][current_position[1]] > 0:
-                    steps += 1
-                    current_position = (current_position[0] + dx, current_position[1] + dy)
-                if steps != 0:
-                    safety_features.append(1 / steps)
-                else:
-                    safety_features.append(steps)
-
-    return safety_features
-
-
-# Define function to calculate danger feature
-def danger_features(game_state):
-    position = game_state["self"][3]
-    bombs = game_state["bombs"]
-
-    danger_features = []
-
-    directions = ["RIGHT", "LEFT", "DOWN", "UP"]
-
-    for direction in directions:
-        dx, dy = 0, 0
-
-        if direction == "RIGHT":
-            dx = 1
-        elif direction == "LEFT":
-            dx = -1
-        elif direction == "DOWN":
-            dy = 1
-        elif direction == "UP":
-            dy = -1
-
-        current_position = position
-
-        for _ in range(3):  # Check the next 3 tiles in the direction
-            current_position = (current_position[0] + dx, current_position[1] + dy)
-
-            # Check if the current position is within the game board
-            if not is_valid_position(current_position, game_state["field"]):
-                danger_features.append(0)  # No danger in this direction
-                break
-
-            # Check if there is a bomb or explosion at the current position
-
-            if any(current_position == bomb[0] for bomb in bombs) or game_state["explosion_map"][current_position[0]][
-                current_position[1]] > 0:
-                danger_features.append(-1)
-        else:
-            danger_features.append(0)  # No danger in this direction
-
-    return danger_features[:4]
-
-
 # Define function to calculate opponents feature
 def opponent_features(game_state):
     position = game_state["self"][3]
@@ -379,7 +296,6 @@ def opponent_features(game_state):
                 or field[new_position[0]][new_position[1]] == WALL
         ):
             # If moving in this direction would hit a wall or go out of bounds,
-            # set a large value to represent that it's not possible to reach an opponent
             opponent_distances.append(-1)
         else:
             nearest_opponent_distance = 9999
@@ -392,7 +308,142 @@ def opponent_features(game_state):
     return opponent_distances
 
 
-# Define function to convert game state to features
+# Define function to calculate bomb features if placed at the current position
+def bomb_features(game_state):
+    position = game_state["self"][3]
+    field = game_state["field"]
+    opponents = game_state["others"]
+    bomb_range = 3  # Constant bomb range
+
+    if not game_state['self'][2]:
+        return [-1]
+
+    def count_destroyed_crates(position):
+        destroyed_crates = 0
+
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            for i in range(1, bomb_range + 1):
+                x, y = position[0] + dx * i, position[1] + dy * i
+                if not is_valid_position((x, y), field) or field[x][y] == WALL:
+                    break  # Stop if we encounter a wall
+                if field[x][y] == CRATE:
+                    destroyed_crates += 1
+
+        return destroyed_crates
+
+    def count_killed_opponents(position):
+        killed_opponents = 0
+
+        for opponent in opponents:
+            if opponent[0] == position:
+                killed_opponents += 1
+
+        return killed_opponents
+
+    destroyed_crates = count_destroyed_crates(position)
+    killed_opponents = count_killed_opponents(position)
+
+    bomb_effect = destroyed_crates + 10 * killed_opponents
+
+    # Check if the bomb can't destroy anything or if there is no safe path to escape
+    if bomb_effect == 0 or shortest_path_to_safety(position, bomb_range, field, [(position, 3)]) == float('inf'):
+        return [-1]
+    else:
+        return [bomb_effect]
+
+
+# Define function to calculate the nearest distances to safe tiles in all direction if there is a bomb
+def safety_features(game_state):
+    position = game_state["self"][3]
+    field = game_state["field"]
+    bombs = game_state["bombs"]
+    bomb_range = 3  # Constant bomb range
+
+    directions = ["RIGHT", "LEFT", "DOWN", "UP"]
+
+    if is_in_bomb_range(position, bombs):
+        min_steps_to_safety = float('inf')
+        best_direction = -1
+
+        for i, direction in enumerate(directions):
+            dx, dy = 0, 0
+
+            if direction == "RIGHT":
+                dx = 1
+            elif direction == "LEFT":
+                dx = -1
+            elif direction == "DOWN":
+                dy = 1
+            elif direction == "UP":
+                dy = -1
+
+            new_position = (position[0] + dx, position[1] + dy)
+            steps = shortest_path_to_safety(new_position, bomb_range, field, bombs)
+
+            if steps < min_steps_to_safety:
+                min_steps_to_safety = steps
+                best_direction = i
+
+        safety_features = [-1 if i != best_direction else 5 for i in range(4)]
+    else:
+        safety_features = [0, 0, 0, 0]
+
+    return safety_features
+
+
+# Define function to calculate danger feature
+def danger_features(game_state):
+    position = game_state["self"][3]
+
+    danger_features = []
+    bombs = game_state['bombs']
+    directions = ["RIGHT", "LEFT", "DOWN", "UP"]
+
+    for direction in directions:
+        dx, dy = 0, 0
+
+        if direction == "RIGHT":
+            dx = 1
+        elif direction == "LEFT":
+            dx = -1
+        elif direction == "DOWN":
+            dy = 1
+        elif direction == "UP":
+            dy = -1
+
+        next_position = position
+
+        next_position = (next_position[0] + dx, next_position[1] + dy)
+
+        def is_in_bomb_range(position, bombs):
+            for (x, y), countdown in bombs:
+                if x == position[0] and abs(y - position[1]) <= 3:
+                    return True
+                if y == position[1] and abs(x - position[0]) <= 3:
+                    return True
+            return False
+
+        # Check if the current position is within the game board
+        if not is_valid_position(next_position, game_state["field"]):
+            danger_features.append(0)  # No danger in this direction
+            break
+
+        if len(bombs) > 0 and not is_in_bomb_range(position, bombs):
+            if is_in_bomb_range(next_position, bombs):
+                danger_features.append(-1)
+            else:
+                danger_features.append(0)  # No danger in this direction
+        else:
+            # Check if there is a bomb or explosion at the current position
+
+            if game_state["explosion_map"][next_position[0]][next_position[1]] > 0:
+                danger_features.append(-1)
+            else:
+                danger_features.append(0)  # No danger in this direction
+
+    return danger_features
+
+
 # Define function to convert game state to features
 def state_to_features(self, game_state):
     features = []
@@ -406,8 +457,8 @@ def state_to_features(self, game_state):
     features.extend(crate_distances)
 
     # Calculate opponents distances
-    opponents_feature = opponent_features(game_state)
-    features.extend(opponents_feature)
+    opponent_distances = opponent_features(game_state)
+    features.extend(opponent_distances)
 
     # Calculate bomb scope feature
     bomb_feature = bomb_features(game_state)

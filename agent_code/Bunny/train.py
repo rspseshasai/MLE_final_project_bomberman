@@ -13,22 +13,12 @@ from .model import QLearningAgent
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
-# TODO: Remove hard coding this value
-TOTAL_EPISODES = 10000
+TOTAL_ROUNDS = 100
 LINEAR_CONSTANT_QUOTIENT = 0.85
-EPSILON = (0.8, 0.3)
+EPSILON = (0.6, 0.3)
 
 
 def setup_training(self):
-    """
-    Initialize self for training purpose and set hyperparameters.
-
-    This is called after `setup` in callbacks.py.
-
-    :param self: This object is passed to all callbacks, and you can set arbitrary values.
-    """
-
-    # Initialize a Q-learning agent instance with PyTorch
     self.q_learning_agent = QLearningAgent()
     self.episode_counter = 0
     # Hyperparameters
@@ -36,28 +26,18 @@ def setup_training(self):
     self.q_learning_agent.DISCOUNT_FACTOR = 0.85
     self.q_learning_agent.optimizer = optim.Adam(self.q_learning_agent.q_network.parameters(),
                                                  lr=self.q_learning_agent.LEARNING_RATE)
-    self.epsilon_begin = EPSILON[0]
-    self.epsilon_end = EPSILON[1]
-    self.training_episodes = TOTAL_EPISODES
-    self.epsilon_arr = generate_eps_greedy_policy(self, LINEAR_CONSTANT_QUOTIENT)
+    self.total_rounds = TOTAL_ROUNDS
+    self.epsilon_range = epsilon_greedy_policy(self, LINEAR_CONSTANT_QUOTIENT)
 
 
-def generate_eps_greedy_policy(self, q):
-    '''
-    :param self: the network that is used for training
-            (contains eps-threshold for start and end of training
-            and the number of total episodes)
-    :param q: the fraction of the training where the eps-threshold is linearly diminished
-
-    returns: array containing the eps-thresholds for training
-    '''
-    N = self.training_episodes
+def epsilon_greedy_policy(self, q):
+    N = self.total_rounds
     N_1 = int(N * q)
     N_2 = N - N_1
-    eps1 = np.linspace(self.epsilon_begin, self.epsilon_end, N_1)
+    eps1 = np.linspace(EPSILON[0], EPSILON[1], N_1)
     if N_1 == N:
         return eps1
-    eps2 = np.ones(N_2) * self.epsilon_end
+    eps2 = np.ones(N_2) * EPSILON[1]
     return np.append(eps1, eps2)
 
 
@@ -76,7 +56,7 @@ def calculate_round_score(events: List[str]) -> int:
     return coin_reward + opponent_reward
 
 
-def track_game_score(self, smooth=False):
+def plot_scores(self, smooth=False):
     global scores_per_round
     global game_score_arr
 
@@ -102,47 +82,19 @@ def track_game_score(self, smooth=False):
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
-    """
-    Called at the end of each game or when the agent died to hand out final rewards.
-    This replaces game_events_occurred in this round.
-
-    This is similar to game_events_occurred. self.events will contain all events that
-    occurred during your agent's final step.
-
-    This is *one* of the places where you could update your agent.
-    This is also a good place to store an agent that you updated.
-
-    :param self: The same object that is passed to all of your callbacks.
-    """
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
 
     reward = reward_from_events(self, events)
     self.q_learning_agent.update_q_table(state_to_features(self, last_game_state), last_action, reward, None)
-    self.q_learning_agent.save_model("saved_parameters/my-saved-model.pt")
+    self.q_learning_agent.save_model("saved_parameters/model.pt")
 
     round_score = calculate_round_score(events)
     scores_per_round.append(round_score)  # Store the round score
     self.episode_counter += 1
-    track_game_score(self)
+    plot_scores(self)
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
-    """
-    Called once per step to allow intermediate rewards based on game events.
-
-    When this method is called, self.events will contain a list of all game
-    events relevant to your agent that occurred during the previous step. Consult
-    settings.py to see what events are tracked. You can hand out rewards to your
-    agent based on these events and your knowledge of the (new) game state.
-
-    This is *one* of the places where you could update your agent.
-
-    :param self: This object is passed to all callbacks and you can set arbitrary values.
-    :param old_game_state: The state that was passed to the last call of `act`.
-    :param self_action: The action that you took.
-    :param new_game_state: The state the agent is in now.
-    :param events: The events that occurred when going from  `old_game_state` to `new_game_state`
-    """
     self.logger.debug(f'Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
 
     # Calculate the standard reward from events
@@ -163,24 +115,18 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
 
 def reward_from_events(self, events: List[str]) -> int:
-    """
-    *This is not a required function, but an idea to structure your code.*
-
-    Here you can modify the rewards your agent get so as to en/discourage
-    certain behavior.
-    """
     game_rewards = {
-        e.COIN_COLLECTED: 100,
-        e.KILLED_OPPONENT: 500,
         e.MOVED_RIGHT: -1,
         e.MOVED_LEFT: -1,
         e.MOVED_UP: -1,
         e.MOVED_DOWN: -1,
-        e.WAITED: -1,
-        e.INVALID_ACTION: -10,
-        e.BOMB_DROPPED: -1,
         e.KILLED_SELF: 0,
         e.GOT_KILLED: -500,
+        e.COIN_COLLECTED: 100,
+        e.BOMB_DROPPED: -1,
+        e.WAITED: -1,
+        e.KILLED_OPPONENT: 500,
+        e.INVALID_ACTION: -10,
     }
     reward_sum = 0
     for event in events:
@@ -191,14 +137,6 @@ def reward_from_events(self, events: List[str]) -> int:
 
 
 def reward_for_crate_destruction(self, events: List[str]) -> int:
-    """
-    Give rewards immediately after placing bombs for crate destruction.
-
-    :param self: This object is passed to all callbacks and you can set arbitrary values.
-    :param events: Predefined events (events.py) that occurred in the game step.
-
-    :return: Reward based on how many crates will be destroyed by a dropped bomb.
-    """
     crate_destruction_reward = 0
 
     # Check if any crates were destroyed
