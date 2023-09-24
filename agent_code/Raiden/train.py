@@ -6,14 +6,14 @@ import torch.optim as optim
 from scipy.ndimage import uniform_filter1d
 
 import events as e
-from agent_code.Bunny.features import state_to_features
+from .features import state_to_features
 from .model import QLearningAgent
 
 # Hyperparameters
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
-TOTAL_ROUNDS = 10000
+TOTAL_ROUNDS = 1000
 LINEAR_CONSTANT_QUOTIENT = 0.85
 EPSILON = (0.6, 0.2)
 
