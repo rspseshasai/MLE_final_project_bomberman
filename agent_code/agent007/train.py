@@ -17,7 +17,7 @@ PLACEHOLDER_EVENT = "PLACEHOLDER"
 # Initialize variables for tracking training progress
 scores_per_round = []
 game_score_arr = []
-# TODO: Remove hard coding this value
+# TODO: Remove hard coded value
 TOTAL_EPISODES = 5000
 LINEAR_CONSTANT_QUOTIENT = 0.9
 EPSILON = (0.9, 0.4)
