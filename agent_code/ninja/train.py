@@ -27,8 +27,8 @@ def setup_training(self):
     self.LEARNING_RATE = 0.001
     self.BATCH_SIZE = 32
     self.EPISODES = 1000
-    self.EPSILON_START = 0.9
-    self.EPSILON_END = 0.1
+    self.EPSILON_START = 0.7
+    self.EPSILON_END = 0.2
     self.EPSILON_DECAY = 0.995
 
     # Initialize other training variables
