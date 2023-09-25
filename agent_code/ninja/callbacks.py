@@ -7,7 +7,8 @@ import numpy as np
 import torch
 from torch import optim
 
-from agent_code.ninja.model import RNNModel, RNNLearningAgent
+from agent_code.ninja.model import RNNModel
+from agent_code.ninja.rule_based_for_random import wait_if_bomb_or_explosion, random_clever_move
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 # Define the maximum number of features per channel
@@ -15,16 +16,6 @@ MAX_FEATURES_PER_CHANNEL = 10
 
 
 def setup(self):
-    """
-    Setup your code. This is called once when loading each agent.
-    Make sure that you prepare everything such that act(...) can be called.
-
-    When in training mode, the separate setup_training in train.py is called
-    after this method. This separation allows you to share your trained agent
-    with other students, without revealing your training code.
-
-    In this example, we initialize our RNN model and other necessary components.
-    """
     self.logger.info("Setting up agent...")
 
     # Initialize your RNN model here
@@ -51,22 +42,18 @@ def setup(self):
 
 
 def act(self, game_state: dict) -> str:
-    """
-    Your agent should parse the input, think, and take a decision.
-    When not in training mode, the maximum execution time for this method is 0.5s.
-
-    :param self: The same object that is passed to all of your callbacks.
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
     if self.train:
         # Calculate epsilon based on decay
         epsilon = max(self.EPSILON_END, self.EPSILON_START * self.EPSILON_DECAY ** self.EPISODES)
 
         if random.random() < epsilon:
-            self.logger.debug("Choosing action purely at random.")
-            # Exploration: Choose a random action with a certain probability
-            return np.random.choice(ACTIONS, p=[1 / len(ACTIONS)] * len(ACTIONS))
+            action = random_clever_move(self, game_state)
+            self.logger.info(f"Select action {action} after the rule-based agent.")
+
+            action_wait = wait_if_bomb_or_explosion(self, game_state, action)
+            if action_wait is not None:
+                return action_wait
+            return action
 
     # Exploitation: Query the model for the best action
     self.logger.debug("Querying model for action.")
