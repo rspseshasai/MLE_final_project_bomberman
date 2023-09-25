@@ -8,21 +8,8 @@ from queue import PriorityQueue
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
-
 def setup(self):
-    """
-    Setup your code. This is called once when loading each agent.
-    Make sure that you prepare everything such that act(...) can be called.
 
-    When in training mode, the separate `setup_training` in train.py is called
-    after this method. This separation allows you to share your trained agent
-    with other students, without revealing your training code.
-
-    In this example, our model is a set of probabilities over actions
-    that are independent of the game state.
-
-    :param self: This object is passed to all callbacks and you can set arbitrary values.
-    """
     if self.train or not os.path.isfile("logs/saved-model.pt"):
         self.logger.info("Setting up model from start.")
         weights = np.random.rand(len(ACTIONS))
@@ -39,7 +26,6 @@ def setup(self):
 def wait_if_bomb_or_explosion(self, game_state, action):
     # Check if the selected action leads to an explosion
     if will_run_into_explosion(self, game_state, action):
-        # print("Selected action leads to an explosion. Waiting instead.")
         self.logger.info("Selected action leads to an explosion. Waiting instead.")
         return "WAIT"
 
@@ -51,7 +37,8 @@ def wait_if_bomb_or_explosion(self, game_state, action):
         if is_position_in_bomb_range(next_position, bomb_positions):
             return "WAIT"
 
-
+"""
+Used Greedy epsilon due to better result; abandoned softmax action selection.
 def softmax_action_selection(q_values, temperature):
     exp_values = np.exp(q_values / temperature)
     action_probs = exp_values / exp_values.sum()
@@ -89,16 +76,41 @@ def act(self, game_state: dict) -> str:
         self.logger.debug("Using model for action.")
 
     return get_best_move(self, game_state)
+"""
+
+def act(self, game_state: dict) -> str:
+
+    self.features = state_to_features(game_state)
+    if self.train:
+        # Training mode: Perform exploration and exploitation
+        random_prob = self.epsilon_arr[self.episode_counter]
+        if random.random() <= random_prob:
+            if random_prob > 0.1:
+                if np.random.randint(10) == 0:  # old: 10 / 100 now: 3/4
+                    action = np.random.choice(ACTIONS, p=[.167, .167, .167, .167, .166, .166])
+                    self.logger.info(f"Choose action {action} completely at random")
+
+                else:
+                    action = random_clever_move(self, game_state)
+                    self.logger.info(f"Select action {action} after the rule-based agent.")
+
+            action_wait = wait_if_bomb_or_explosion(self, game_state, action)
+            if action_wait is not None:
+                return action_wait
+            return action
+
+        self.logger.debug("Querying model for action.")
+        # Use the DQN agent to choose the action
+    else:
+        # Testing mode: Already loaded the model during setup
+        self.logger.debug("Using model for action.")
+
+    return get_best_move(self, game_state)
+
 
 
 def will_run_into_explosion(self, game_state: dict, action: str) -> bool:
-    """
-    Check if the selected action will lead the agent into an explosion.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :param action: The selected action as a string.
-    :return: True if the action leads to an explosion, False otherwise.
-    """
     # Get the agent's current position
     position = game_state["self"][3]
 
@@ -123,7 +135,7 @@ def get_best_move(self, game_state: dict) -> str:
     best_action_index = np.argmax(q_values_array)
     best_action = ACTIONS[best_action_index]
     self.logger.info(f"Predicted action {best_action} by our QNet model.")
-    # print(f"Predicted action {best_action} by our QNet model.")
+
     return best_action
 
 
@@ -156,12 +168,7 @@ def random_clever_move(self, game_state: dict) -> str:
 
 
 def should_run_away_from_explosion(self, game_state: dict) -> bool:
-    """
-    Determine if the agent should run away from nearby explosions based on the explosion map.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: True if the agent should run away from explosions, False otherwise.
-    """
     position = game_state["self"][3]
     explosion_map = game_state["explosion_map"]
 
@@ -173,12 +180,7 @@ def should_run_away_from_explosion(self, game_state: dict) -> bool:
 
 
 def run_away_from_explosion(self, game_state: dict) -> str:
-    """
-    Implement logic to move away from nearby explosions based on the explosion map.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
     position = game_state["self"][3]
     explosion_map = game_state["explosion_map"]
 
@@ -262,12 +264,7 @@ def move_to_nearest_crate(self, game_state: dict) -> str:
 
 
 def is_crate_blocking_path(self, game_state: dict) -> bool:
-    """
-    Check if there is a crate blocking the path to collect coins.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: True if a crate is blocking the path, False otherwise.
-    """
     coins = game_state["coins"]
     position = game_state["self"][3]
 
@@ -299,12 +296,7 @@ def is_crate_blocking_path(self, game_state: dict) -> bool:
 
 
 def is_crate_nearby(self, game_state: dict) -> bool:
-    """
-    Check if there is a crate nearby.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: True if a crate is nearby, False otherwise.
-    """
     position = game_state["self"][3]
 
     # Get a list of all reachable crates and their positions
@@ -318,12 +310,7 @@ def is_crate_nearby(self, game_state: dict) -> bool:
 
 
 def is_opponent_nearby(self, game_state: dict) -> bool:
-    """
-    Check if there is an opponent nearby.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: True if an opponent is nearby, False otherwise.
-    """
     position = game_state["self"][3]
     opponents = [agent[3] for agent in game_state["others"]]
 
@@ -335,23 +322,12 @@ def is_opponent_nearby(self, game_state: dict) -> bool:
 
 
 def get_bomb_positions(game_state: dict) -> list:
-    """
-    Get the positions of bombs on the board.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: List of bomb positions as [(x, y)].
-    """
     bomb_positions = [(x, y) for x, y in game_state["bombs"]]
     return bomb_positions
 
 
 def avoid_bombs(self, game_state: dict) -> str:
-    """
-    Implement logic to move away from nearby bombs and explosions.
-
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
 
     position = game_state["self"][3]
     bomb_positions = get_bomb_positions(game_state)
@@ -393,13 +369,7 @@ def avoid_bombs(self, game_state: dict) -> str:
 
 
 def get_next_position(position, action):
-    """
-    Get the next position based on the current position and action.
 
-    :param position: Current position as (x, y).
-    :param action: Action as a string.
-    :return: Next position as (x, y).
-    """
     x, y = position
     if action == "UP":
         return (x, y - 1)
@@ -414,13 +384,7 @@ def get_next_position(position, action):
 
 
 def is_position_in_bomb_range(position, bomb_positions):
-    """
-    Check if a position is in the range of a bomb explosion.
 
-    :param position: The position to check as (x, y).
-    :param bomb_positions: List of bomb positions as [(x, y)].
-    :return: True if the position is in the range of a bomb, False otherwise.
-    """
     for bomb_position, countdown in bomb_positions:
         x, y = position
         bomb_x, bomb_y = bomb_position
@@ -436,12 +400,7 @@ def is_position_in_bomb_range(position, bomb_positions):
 
 
 def collect_coins(self, game_state: dict) -> str:
-    """
-    Move towards and collect the nearest coin.
 
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
     # Get the current position of the agent
     current_position = game_state["self"][3]
 
@@ -460,26 +419,13 @@ def collect_coins(self, game_state: dict) -> str:
 
 
 def minkowski_distance(position1, position2, p=1):
-    """
-    Calculate the Minkowski distance between two positions.
+    # Calculate the Minkowski distance between two positions.
+    # p: The order of the distance (1 for Manhattan, 2 for Euclidean).
 
-    :param position1: The first position as (x, y).
-    :param position2: The second position as (x, y).
-    :param p: The order of the distance (1 for Manhattan, 2 for Euclidean, etc.).
-    :return: The Minkowski distance between the two positions.
-    """
     return (abs(position1[0] - position2[0])**p + abs(position1[1] - position2[1])**p)**(1/p)
 
 
 def move_towards_target(self, current_position, target_position, game_state):
-    """
-    Determine the action that moves the agent towards the target position using A* algorithm.
-
-    :param current_position: The current position as (x, y).
-    :param target_position: The target position as (x, y).
-    :param game_state: The dictionary that describes everything on the board.
-    :return: The action to take as a string.
-    """
 
     def heuristic(position, target):
         return abs(position[0] - target[0]) + abs(position[1] - target[1])

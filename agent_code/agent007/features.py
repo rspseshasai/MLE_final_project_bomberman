@@ -1,12 +1,6 @@
 import numpy as np
 
 def state_to_features(game_state: dict) -> np.array:
-    """
-    Converts the game state to the input of your model, i.e., a feature tensor.
-
-    :param game_state: A dictionary describing the current game board.
-    :return: np.array
-    """
 
     if game_state is None:
         return None

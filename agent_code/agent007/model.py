@@ -4,7 +4,7 @@ import torch.optim as optim
 import random
 from collections import namedtuple, deque
 
-# Define a named tuple for storing experience transitions
+# Defined a named tuple for storing experience transitions
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
@@ -36,16 +36,6 @@ class DQNAgent:
         self.EXPLORATION_PROB = 0.9
         self.target_update_interval = 0.4
         self.steps_done = 0
-
-    def select_action(self, state):
-        # Epsilon-greedy action selection
-        self.steps_done += 1
-        if random.random() < self.exploration_prob:
-            return random.choice(range(self.output_dim))  # Choose a random action
-        else:
-            with torch.no_grad():
-                q_values = self.q_network(state)
-                return q_values.argmax().item()  # Choose the action with the highest Q-value
 
     def update_q_network(self, state, action, reward, next_state):
         # Store transition in the replay buffer
