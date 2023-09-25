@@ -1,4 +1,4 @@
-from agent_code.agent007.features import state_to_features
+from .features import state_to_features
 from .model import DQNAgent
 from typing import List
 import matplotlib.pyplot as plt
