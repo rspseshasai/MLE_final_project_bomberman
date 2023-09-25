@@ -4,18 +4,7 @@ from torch import optim
 
 import events as e
 from .callbacks import state_to_features
-from .model import RNNModel, RNNLearningAgent
-
-# This is only an example!
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
-
-# Hyper parameters -- DO modify
-TRANSITION_HISTORY_SIZE = 3  # keep only ... last transitions
-RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
-
-# Events
-PLACEHOLDER_EVENT = "PLACEHOLDER"
+from .model import RNNLearningAgent
 
 
 def setup_training(self):
@@ -26,7 +15,7 @@ def setup_training(self):
     self.DISCOUNT_FACTOR = 0.99
     self.LEARNING_RATE = 0.001
     self.BATCH_SIZE = 32
-    self.EPISODES = 1000
+    self.EPISODES = 10000
     self.EPSILON_START = 0.7
     self.EPSILON_END = 0.2
     self.EPSILON_DECAY = 0.995
@@ -91,10 +80,17 @@ def reward_from_events(self, events: list) -> float:
     """
     # Define rewards for specific events
     game_rewards = {
-        e.COIN_COLLECTED: 1.0,
-        e.KILLED_OPPONENT: 5.0,
-        e.KILLED_SELF: -5.0,
-        # Add other rewards and penalties as needed
+        e.MOVED_RIGHT: -1,
+        e.MOVED_LEFT: -1,
+        e.MOVED_UP: -1,
+        e.MOVED_DOWN: -1,
+        e.KILLED_SELF: -400,
+        e.GOT_KILLED: -500,
+        e.COIN_COLLECTED: 100,
+        e.BOMB_DROPPED: -1,
+        e.WAITED: -1,
+        e.KILLED_OPPONENT: 500,
+        e.INVALID_ACTION: -10,
     }
 
     # Calculate the reward as the sum of event-specific rewards

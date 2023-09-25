@@ -1,7 +1,7 @@
+import random
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import random
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
@@ -82,4 +82,3 @@ class RNNLearningAgent:
 
     def save_rnn_model(self, filename):
         torch.save(self.rnn_model.state_dict(), filename)
-
